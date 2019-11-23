@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Annostract.PaperFinder.Crossref;
-using ApiLibs.General;
+using Martijn.Extensions.Memory;
 using Martijn.Extensions.Linq;
 
 namespace Annostract.PaperFinder
@@ -70,7 +70,7 @@ namespace Annostract.PaperFinder
             input = input.ToLower().Where(i => char.IsLetterOrDigit(i)).Select(i => i.ToString()).Combine((i, j) => $"{i}{j}");
             foreach (var result in res)
             {
-                var test = $"{result.Title.CombineWithSpace()}{result.Subtitle?.CombineWithSpace()}".ToLower().Where(i => char.IsLetterOrDigit(i)).Select(i => i.ToString()).Combine((i, j) => $"{i}{j}");
+                var test = $"{result.Title?.CombineWithSpace()}{result.Subtitle?.CombineWithSpace()}".ToLower().Where(i => char.IsLetterOrDigit(i)).Select(i => i.ToString()).Combine((i, j) => $"{i}{j}");
                 if(input == test) {
                     return result;
                 }

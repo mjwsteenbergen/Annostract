@@ -7,7 +7,6 @@ using org.pdfclown.objects;
 using UglyToad.PdfPig.Geometry;
 using UglyToad.PdfPig;
 using WordExtractor;
-using ApiLibs.General;
 using System.Threading.Tasks;
 using UglyToad.PdfPig.Graphics.Colors;
 using org.pdfclown.documents.contents.colorSpaces;
@@ -16,6 +15,8 @@ using Martijn.Extensions.Linq;
 using System.Text.RegularExpressions;
 using System;
 using org.pdfclown.tools;
+using Martijn.Extensions.Memory;
+using ApiLibs;
 
 namespace Annostract
 {
@@ -27,11 +28,8 @@ namespace Annostract
 
             var file = new File(fpath);
 
-            WordInferer inferer = new WordInferer(await new Memory
-            {
-                Application = "WordCount"
-            }.Read<Dictionary<string, int>>("wrangle-words.json"));
-
+            WordInferer inferer = new WordInferer(await GetStandardDictionary());
+            
             // var annos = file.Document.Pages.SelectMany(i => i.Annotations).ToList();
             using (PdfDocument document = PdfDocument.Open(fpath))
             {
@@ -79,6 +77,24 @@ namespace Annostract
 
 
             return extract;
+        }
+
+        public async static Task<Dictionary<string, int>> GetStandardDictionary()
+        {
+            return await new Memory
+            {
+                Application = "WordCount",
+                CreateDirectoryIfNotExists = true
+            }.ReadOrCalculate<Dictionary<string, int>>("wrangle-words.json", () => {
+                return new GistService().GetGist<Dictionary<string, int>>("mjwsteenbergen", "9ca33ead61d0c42475194ba1706139e2", "word-list.json");
+            });
+        }
+
+        class GistService : Service
+        {
+            public GistService() : base("https://gist.githubusercontent.com/") { }
+
+            public Task<T> GetGist<T>(string username, string gistId, string file) => MakeRequest<T>($"{username}/{gistId}/raw/{file}");
         }
 
         public static (int index, string word) CombineWithWord(decimal[] numberArray, int pageNumber, PdfDocument document) {

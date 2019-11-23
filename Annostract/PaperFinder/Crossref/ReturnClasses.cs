@@ -4,10 +4,9 @@ using System.Globalization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using J = Newtonsoft.Json.JsonPropertyAttribute;
-using R = Newtonsoft.Json.Required;
 using N = Newtonsoft.Json.NullValueHandling;
-using System.Net;
-using System.Threading.Tasks;
+using System.Linq;
+using Martijn.Extensions.Linq;
 
 #pragma warning disable CS8618
 
@@ -87,7 +86,7 @@ namespace Annostract.PaperFinder.Crossref
         public override bool Equals(object obj)
         {
             if(obj != null && obj is CrossRefSearchResult other) {
-                return other.Doi.Equals(this.Doi) || this.Title == other.Title;
+                return (this.Doi ?? this.Issn?.FirstOrDefault() ?? this.Isbn?.FirstOrDefault() ?? this.Title?.CombineWithSpace() ?? "HOW") == (other.Doi ?? other.Issn?.FirstOrDefault() ?? other.Isbn?.FirstOrDefault() ?? other.Title?.CombineWithSpace() ?? "HOW");
             }
             return false;
         }
@@ -95,7 +94,7 @@ namespace Annostract.PaperFinder.Crossref
         // override object.GetHashCode
         public override int GetHashCode()
         {
-            return this.Doi.GetHashCode();
+            return (this.Doi ?? this.Issn?.FirstOrDefault() ?? this.Isbn?.FirstOrDefault() ?? this.Title?.CombineWithSpace() ?? "HOW").GetHashCode();
         }
     }
 
