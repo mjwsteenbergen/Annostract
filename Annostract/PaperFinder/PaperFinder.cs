@@ -14,7 +14,8 @@ namespace Annostract.PaperFinder
         {
             Memory mem = new Memory()
             {
-                Application = "Annostract"
+                Application = "Annostract",
+                CreateDirectoryIfNotExists = true
             };
 
             var dict = await mem.Read("academic-calls-crossref.json", new Dictionary<string, CrossRefSearchResult>());
