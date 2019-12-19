@@ -9,70 +9,164 @@ using System.Text.Json;
 using UglyToad.PdfPig.Tokens;
 using System.Threading.Tasks;
 using System.IO;
+using Martijn.Extensions.Linq;
+using System.Text.Json.Serialization;
+using UglyToad.PdfPig.DocumentLayoutAnalysis;
 
 namespace Annostract
 {
     public static class AnnotationExtractor
     {
-        public static ExtractedFile Extract(string fpath)
+        public static ExtractedFile Extract(DirectoryInfo baseDir, FileInfo pdfFile)
         {
             ExtractedFile file = null;
-            using (PdfDocument document = PdfDocument.Open(fpath))
+            using (PdfDocument document = PdfDocument.Open(pdfFile.FullName))
             {
+                DateTime time = DateTime.Now;
                 
-                file = new ExtractedFile(fpath, document.Information.Author);
-
-                foreach (var page in document.Pages())
-                {
-                    foreach (var annotation in page.ExperimentalAccess.GetAnnotations())
+                file = new ExtractedFile(pdfFile, document.Information.Author);
+                try {
+                    foreach (var page in document.GetPages())
                     {
-                        List<PdfRectangle> rects = new List<PdfRectangle>();
+                        string? allText = null;
+                        IEnumerable<Word> words = null;
 
-                        var dict = annotation.AnnotationDictionary.Data;
-                        if(!dict.Keys.Contains("QuadPoints"))
+
+                        // var images = 
+                        var annos = page.ExperimentalAccess.GetAnnotations();
+                        foreach (var annotation in annos.Where(i => i.Type == AnnotationType.Highlight || i.Type == AnnotationType.Ink))
                         {
-                            continue;
-                        } 
+                            if(allText == null || words == null) {
+                                allText = page.Text;
+                                words = page.GetWords(new NearestNeighbourWordExtractor());
+                            }
 
-                        var numberArray = (dict["QuadPoints"] as ArrayToken).Data.OfType<NumericToken>().Select(i => i.Data).ToArray();
-
-                        for (int i = 0; i < numberArray.Length; i += 8)
-                        {
-                            rects.Add(new PdfRectangle(numberArray[i + 0], numberArray[i + 1], numberArray[i + 6], numberArray[i + 7]));
-                        }
-
-                        string text = "";
-                        foreach (var word in page.GetWords())
-                        {
-                            if (rects.Any(rect => word.BoundingBox.ContainedIn(rect)))
+                            var result = annotation.Type switch
                             {
-                                var avg = word.Letters.Select(i => i.Location.X).Select((i, j) => i - word.Letters[(j - 1) > 0 ? (j - 1) : 0].Location.X).Average();
+                                AnnotationType.Highlight => ExtractHighlight(annotation, page, allText, words),
+                                AnnotationType.Ink => ImageExtractor.Extract(baseDir, pdfFile.Name, page, annotation),
+                                _ => null
+                            };
 
-                                var wordText = "";
-
-                                for (int i = 0; i < word.Letters.Count; i++)
-                                {
-                                    var diff = word.Letters[i].Location.X - word.Letters[(i - 1) > 0 ? (i - 1) : 0].Location.X;
-                                    wordText += word.Letters[i].Value;
-                                }
-
-                                text += wordText + " ";
+                            if (result != null)
+                            {
+                                file.Results.Add(result);
                             }
                         }
-
-                        file.Results.Add(new Result(text, annotation.Content));
                     }
+                } catch (Exception e) {
+                    Console.WriteLine(e.Message);
                 }
+
+                Console.Write((DateTime.Now - time).TotalSeconds.ToString("F3").PadLeft(12));
+                Console.WriteLine(" Finished Extracting " + file.FileName);
+
+                return file;
             }
-            return file;
+        }
+
+        public static Result ExtractHighlight(UglyToad.PdfPig.Annotations.Annotation annotation, Page page, string allText, IEnumerable<Word> words) {
+            List<PdfRectangle> rects = new List<PdfRectangle>();
+
+            var dict = annotation.AnnotationDictionary.Data;
+            if (!dict.Keys.Contains("QuadPoints"))
+            {
+                throw new Exception("Highlight does not contain QuadPoints");
+            }
+
+            var numberArray = (dict["QuadPoints"] as ArrayToken).Data.OfType<NumericToken>().Select(i => i.Data).ToArray();
+
+            for (int i = 0; i < numberArray.Length; i += 8)
+            {
+                rects.Add(new PdfRectangle(numberArray[i + 0], numberArray[i + 1], numberArray[i + 6], numberArray[i + 7]));
+            }
+
+            string text = "";
+            List<decimal> avgs = new List<decimal>();
+            int counter = 0;
+            
+            foreach ((Word word, string actualText) in FixText(allText, words))
+            {
+                if (rects.Any(rect => word.BoundingBox.ContainedIn(rect)))
+                {
+                    var letters = word.Letters.Select(i => (content: i.Value, br: i.StartBaseLine.X + i.Width, bl: i.StartBaseLine.X)).ToList();
+                    List<string> chars = new List<string> {
+                        letters[0].content
+                    };
+
+                    var actactualText = actualText;
+
+                    if(actualText.Length != word.Text.Length) {
+                        actactualText = word.Text;
+                    }
+
+                    text += actactualText + " ";
+                }
+                counter += word.Text.Length;
+            }
+
+            if(avgs.Count > 0) {
+                Console.WriteLine(avgs.Average());
+                Console.WriteLine(avgs.Min());
+            }
+
+            var color = (dict["C"] as ArrayToken).Data.OfType<NumericToken>().ToArray();
+
+
+            //, AnnoSerializer.Convert(annotation.)
+            return new HighlightResult(text, annotation.Content, ColorConverter.Convert((double)color[0].Data, (double) color[1].Data, (double) color[2].Data));
+        }
+
+        private static List<(Word w, string actualText)> FixText(string allText, IEnumerable<Word> words)
+        {
+            List<(Word w, string actualText)> list = new List<(Word w, string actualText)>();
+
+            var allChars = new Stack<char>(allText.Reverse());
+            var wordStack = new Stack<Word>(words.Reverse());
+            var currentWord = wordStack.Pop();
+            var downWord = currentWord.Text.ToList();
+            var actualText = "";
+
+            while(allChars.Count != 0) {
+                var newChar = allChars.Pop();
+                if(!downWord.Contains(newChar)) {
+                    if(wordStack.Count > 2 && wordStack.Peek().Text.Contains(newChar)) {
+                        list.Add((currentWord, actualText));
+
+                        currentWord = wordStack.Pop();
+                        downWord = currentWord.Text.ToList();
+                        actualText = "";
+                    } else {
+                        continue;
+                    }
+                } 
+
+                actualText += newChar;
+                downWord.Remove(newChar);
+            }
+
+            
+            list.Add((currentWord, actualText));
+
+            while(wordStack.Count > 0) {
+                list.Add((wordStack.Peek(), wordStack.Pop().Text));
+            }
+
+            return list;
+        }
+
+        private static string FixText(string allText, int counter, string text)
+        {
+            return allText.Substring(counter, text.Length);
         }
     }
 
     public class ExtractedFile {
-        public string FilePath { get; set; }
-        public string FileName => Path.GetFileNameWithoutExtension(FilePath);
+        [JsonIgnore]
+        public FileInfo FilePath { get; set; }
+        public string FileName => FilePath.Name.Replace(FilePath.Extension, "");
 
-        public ExtractedFile(string filePath, string authors)
+        public ExtractedFile(FileInfo filePath, string authors)
         {
             FilePath = filePath;
             Authors = authors;
@@ -84,9 +178,11 @@ namespace Annostract
         public List<Result> Results { get; set; }
     }
 
-    public class Result
+    public interface Result {}
+
+    public class HighlightResult : Result
     {
-        public Result(string highlight, string note, HighlightColor color = HighlightColor.Unknown)
+        public HighlightResult(string highlight, string note, HighlightColor color = HighlightColor.Unknown)
         {
             this.HighlightedText = highlight;
             this.Note = note;
@@ -121,27 +217,21 @@ namespace Annostract
 
     internal static class Extensions
     {
-        public static IEnumerable<Page> Pages(this PdfDocument document)
-        {
-            for (int i = 1; i < document.NumberOfPages; i++)
-            {
-                yield return document.GetPage(i);
-            }
-        }
-
         public static bool ContainedIn(this PdfRectangle word, PdfRectangle highlightBox)
         {
             var avgWordY = (word.BottomRight.Y + word.TopLeft.Y) / 2;
             // return (mine.BottomRight.X >= other.BottomLeft.X && mine.BottomLeft.Y >= other.BottomLeft.Y) &&
             // (mine.BottomLeft.X <= other.TopRight.X && mine.TopRight.Y <= other.TopRight.Y);
-            return highlightBox.BottomRight.Y <= avgWordY && highlightBox.TopLeft.Y >= avgWordY &&
-                (XTest(highlightBox, word.BottomRight) || XTest(highlightBox, word.TopLeft)) && highlightBox.Contains(word.Centroid);
+            return
+            highlightBox.BottomRight.Y <= avgWordY + (highlightBox.Height/10) && highlightBox.TopLeft.Y >= avgWordY - (highlightBox.Height/10) &&
+                XTest(highlightBox, word.Centroid);
+                // && highlightBox.Contains(word.Centroid);
             // return highlightBox.Contains(word.BottomLeft) || highlightBox.Contains(word.BottomRight) || highlightBox.Contains(word.TopLeft) || highlightBox.Contains(word.TopRight);
         }
 
         public static bool XTest(PdfRectangle rect, PdfPoint point)
         {
-            return rect.BottomLeft.X <= point.X && rect.TopRight.X >= point.X;
+            return rect.BottomLeft.X <= (point.X + rect.Width / 20) && rect.TopRight.X >= (point.X - rect.Width / 20);
         }
 
         public static bool Contains(this PdfRectangle rect, PdfPoint point)

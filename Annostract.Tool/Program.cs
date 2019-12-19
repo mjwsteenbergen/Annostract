@@ -20,38 +20,41 @@ namespace Annostract
         /// Extracts annotations from pdf
         /// </summary>
         /// <param name="path">Path to pdf</param>
-        /// <param name="json">Return json instead of parsed text</param>
         /// <param name="o">Write to file</param>
-        static async Task Main(string path, bool json, bool o)
+        /// <param name="formatter">Which formatter to use (markdown(standard) or json)</param>
+        static async Task Main(string path, bool json, bool o, string formatter = "markdown")
         {
-            path = Path.GetFullPath(path);
-            FileAttributes attr = File.GetAttributes(path);
-            var isDir = attr.HasFlag(FileAttributes.Directory);
-
-            
-
             if (path == null)
             {
                 Console.WriteLine("Does not contain path. Exiting");
                 return;
             }
 
-            var extractedFiles = await Run(path, json, isDir, Path.GetFileName(Path.GetDirectoryName(path)) ?? "");
+            path = Path.GetFullPath(path);
+            FileAttributes attr = File.GetAttributes(path);
+            var isDir = attr.HasFlag(FileAttributes.Directory);
 
-            var resultString = "";
+            List<ExtractedFile> extractedFiles;
 
-            if (json)
-            {
-                resultString = System.Text.Json.JsonSerializer.Serialize(extractedFiles, new JsonSerializerOptions()
+            if(isDir) {
+                DirectoryInfo dir = new DirectoryInfo(path);
+                extractedFiles = (await ExtractRecursively(dir, dir).WhenAll()).ToList();
+            } else {
+                var file = new FileInfo(path);
+                extractedFiles = new List<ExtractedFile> {
+                    AnnotationExtractor.Extract(file.Directory, file)
+                };
+            }
+
+
+            var resultString = formatter switch {
+                "markdown" => await AnnoSerializer.Serialize(extractedFiles, path),
+                "json" => System.Text.Json.JsonSerializer.Serialize(extractedFiles, new JsonSerializerOptions()
                 {
                     WriteIndented = true
-                });
-
-            }
-            else
-            {
-                resultString = await AnnoSerializer.Serialize(extractedFiles, path);
-            }
+                }),
+                _ => throw new Exception($"Invalid format {formatter}")
+            };
 
             if (o)
             {
@@ -68,54 +71,12 @@ namespace Annostract
 
         }
 
-        public static async Task<List<ExtractedFile>> Run(string path, bool json, bool isDir, string displayPath)
+
+        public static IEnumerable<Task<ExtractedFile>> ExtractRecursively(DirectoryInfo folder, DirectoryInfo baseDir)
         {
-            List<string> paths = new List<string>();
+            var tasks = folder.EnumerateFiles().Where(i => i.Extension == ".pdf").Select(i => Task.Factory.StartNew(() => AnnotationExtractor.Extract(baseDir, i)));
 
-            FileAttributes attr = File.GetAttributes(path);
-
-            List<ExtractedFile> results = new List<ExtractedFile>();
-
-            var dirTasks = new List<Task<List<ExtractedFile>>>();
-
-            if (isDir)
-            {
-                dirTasks = Directory.GetDirectories(path).Select(dir => Run(dir, json, isDir, displayPath + "/" + Path.GetFileName(Path.GetDirectoryName(dir + "/")))).ToList();
-                paths.AddRange(Directory.GetFiles(path).Where(i => i.EndsWith(".pdf")));
-            }
-            else
-            {
-                paths.Add(path);
-            }
-
-            results = (await paths.Select(pathI => Convert(json, pathI)).WhenAll()).ToList();
-            await dirTasks.ToIAsyncEnumberable().Foreach(i => results.AddRange(i));
-
-
-
-            return results;
-        }
-
-        private static async Task<ExtractedFile> Convert(bool json, string pathI)
-        {
-            StringBuilder builder = new StringBuilder();
-
-            ExtractedFile res = null;
-
-            try
-            {
-                res = await AnnotationExtractorClown.ExtractAsync(pathI);
-            }
-            catch(Exception e)
-            {
-                try {
-                    res = AnnotationExtractor.Extract(pathI);
-                } catch(Exception ex) {
-                    
-                }
-            }
-
-            return res;
+            return tasks.Concat(folder.EnumerateDirectories().SelectMany(i => ExtractRecursively(i, baseDir)));
         }
     }
 }

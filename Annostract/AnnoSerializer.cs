@@ -26,7 +26,7 @@ namespace Annostract
         }
 
         public static async Task<StringBuilder> Serialize(ExtractedFile file, List<ToRead> reads) {
-            var annotations = file.Results.Where(i => (!string.IsNullOrEmpty(i.HighlightedText) || i.Note != null)).Select(i => Convert(i)).ToList();
+            var annotations = file.Results.Select(i => Convert(i)).ToList();
 
             StringBuilder builder = new StringBuilder();
 
@@ -67,7 +67,7 @@ namespace Annostract
             string notes = "";
             foreach (var i in annotations)
             {
-                if(i is Highlight || i is Note || i is Indented|| i is IndentChange|| i is QuickIndent) {
+                if(i is HighlightAnnotation || i is Note || i is Indented|| i is IndentChange|| i is QuickIndent) {
                     string indentString = "   ".Repeat(indent);
 
                     if(i is IndentChange change) {
@@ -83,6 +83,15 @@ namespace Annostract
                 builder.AppendLine(notes);
             }
 
+            var images = annotations.OfType<ImageAnnotation>().Distinct().ToList();
+
+            if (images.Count > 0)
+            {
+                builder.AppendLine($"\n### Images");
+
+                images.ForEach(i => builder.Append(i.ToSummary()));
+            }
+
             reads.AddRange(annotations.OfType<ToRead>());
 
             builder.AppendLine();
@@ -94,7 +103,7 @@ namespace Annostract
         {
             var notHighlighted = extractedFiles.Where(i => i.Results.Count == 0).ToList();
 
-            var filesGroup = extractedFiles.Where(i => i.Results.Count != 0).GroupBy(i => Path.GetDirectoryName(i.FilePath));
+            var filesGroup = extractedFiles.Where(i => i.Results.Count != 0).GroupBy(i => i.FilePath.Directory.Name);
 
             List<ToRead> reads = new List<ToRead>();
 
@@ -114,7 +123,7 @@ namespace Annostract
             }
 
             res.AppendLine();
-            res.AppendLine("# Still to read\n" + notHighlighted.Select(i => $"- {i.FilePath.Replace(originalPath, "")}").CombineWithNewLine());
+            res.AppendLine("# Still to read\n" + notHighlighted.Select(i => $"- {i.FilePath.FullName.Replace(originalPath, "").Replace("[", "\\[")}").CombineWithNewLine());
             res.AppendLine();
 
             if(reads.Count > 0) {
@@ -156,28 +165,71 @@ namespace Annostract
         }
 
         public static Annotation Convert(Result res) {
-            if(res.HighlightedText == null) {
-                res.HighlightedText = "ERROR: THERE SHOULD BE TEXT HERE";
-            }
-
-
-            return (res.Note?.ToLower().Trim().Replace(" ", ""), res.HighlightColor) switch {
-                ("read",_) => new ToRead(res.HighlightedText),
-                ("toread",_) => new ToRead(res.HighlightedText),
-                (_, HighlightColor.Blue) => new ToRead(res.HighlightedText),
-                ("abstract",_) => new Abstract(res.HighlightedText),
-                ("year",_) => new Year(res.HighlightedText),
-                ("doi",_) => new DoiLink(res.HighlightedText),
-                ("-",_) => new Indented(res.HighlightedText),
-                (">",_) => new IndentChange(res.HighlightedText, (i) => i + 1),
-                ("<",_) => new IndentChange(res.HighlightedText, (i) => i - 1),
-                ("<<",_) => new IndentChange(res.HighlightedText, (i) => i - 2),
-                ("<>",_) => new QuickIndent(res.HighlightedText),
-                (null, _) => new Highlight(res.HighlightedText),
-                (_,_) => new Note(res.HighlightedText, res.Note)
+            return res switch {
+                HighlightResult high => Convert(high),
+                ImageResult imageResult => new ImageAnnotation(imageResult.Url),
+                _ => throw new Exception($"Invalid result: {res?.ToString()}")
             };
         } 
 
+        public static Annotation Convert(HighlightResult res) {
+            if (res.HighlightedText == null)
+            {
+                res.HighlightedText = "ERROR: THERE SHOULD BE TEXT HERE";
+            }
+
+            res.HighlightedText = res.HighlightedText.Replace("[", "\\[").Replace("- ", "");
+
+            return (res.Note?.ToLower().Trim().Replace(" ", ""), res.HighlightColor) switch
+            {
+                ("read", _) => new ToRead(res.HighlightedText),
+                ("toread", _) => new ToRead(res.HighlightedText),
+                (_, HighlightColor.Blue) => new ToRead(res.HighlightedText),
+                ("abstract", _) => new Abstract(res.HighlightedText),
+                ("year", _) => new Year(res.HighlightedText),
+                ("doi", _) => new DoiLink(res.HighlightedText),
+                ("-", _) => new Indented(res.HighlightedText),
+                (">", _) => new IndentChange(res.HighlightedText, (i) => i + 1),
+                ("<", _) => new IndentChange(res.HighlightedText, (i) => i - 1),
+                ("<<", _) => new IndentChange(res.HighlightedText, (i) => i - 2),
+                ("<>", _) => new QuickIndent(res.HighlightedText),
+                (null, _) => new HighlightAnnotation(res.HighlightedText),
+                (_, _) => new Note(res.HighlightedText, res.Note)
+            };
+        }
+
+    }
+
+    public class ImageAnnotation : Annotation
+    {
+        public ImageAnnotation(string url)
+        {
+            Url = url;
+        }
+
+        public string Url { get; set; }
+
+        public override string Type => base.Type;
+
+        public override bool Equals(object obj)
+        {
+            return (obj as ImageAnnotation)?.Url == this.Url;
+        }
+
+        public override int GetHashCode()
+        {
+            return this.Url?.GetHashCode() ?? 0;
+        }
+
+        public override string ToString()
+        {
+            return base.ToString();
+        }
+
+        public override string ToSummary(string indent = "")
+        {
+            return $"![]({Url})\n";
+        }
     }
 
     internal class IndentChange : Annotation
@@ -273,8 +325,8 @@ namespace Annostract
         public abstract string ToSummary(string indent = "");
     }
 
-    public class Highlight : Annotation {
-        public Highlight(string highlightedText)
+    public class HighlightAnnotation : Annotation {
+        public HighlightAnnotation(string highlightedText)
         {
             HighlightedText = highlightedText;
         }
@@ -304,7 +356,7 @@ namespace Annostract
         }
     }
 
-    public class Note : Highlight
+    public class Note : HighlightAnnotation
     {
         public Note(string highlightedText, string content) : base(highlightedText)
         {
@@ -315,7 +367,7 @@ namespace Annostract
 
         public override string ToSummary(string indent = "") {
             var res = $"{indent} - \"{HighlightedText}\"\n";
-            res += Content.Replace("[", "\\[").Split('\n').Select(i => $"{indent}    - {i.Trim()}").CombineWithNewLine();
+            res += Content.Split('\n').Select(i => $"{indent}    - {i.Trim()}").CombineWithNewLine();
             return res;
         }
     }
