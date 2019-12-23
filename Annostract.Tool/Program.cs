@@ -21,8 +21,8 @@ namespace Annostract
         /// </summary>
         /// <param name="path">Path to pdf</param>
         /// <param name="o">Write to file</param>
-        /// <param name="formatter">Which formatter to use (markdown(standard) or json)</param>
-        static async Task Main(string path, bool json, bool o, string formatter = "markdown")
+        /// <param name="formatter">Which formatter to use (markdown(standard), markender or json)</param>
+        static async Task Main(string path, bool o, string formatter = "markdown")
         {
             if (path == null)
             {
@@ -48,7 +48,8 @@ namespace Annostract
 
 
             var resultString = formatter switch {
-                "markdown" => await AnnoSerializer.Serialize(extractedFiles, path),
+                "markender" => await new MarkenderSerializer().Serialize(extractedFiles, path),
+                "markdown" => await new AnnoSerializer().Serialize(extractedFiles, path),
                 "json" => System.Text.Json.JsonSerializer.Serialize(extractedFiles, new JsonSerializerOptions()
                 {
                     WriteIndented = true

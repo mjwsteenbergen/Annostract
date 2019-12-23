@@ -12,7 +12,7 @@ using Annostract.PaperFinder.Crossref;
 
 namespace Annostract
 {
-    public static class AnnoSerializer
+    public class AnnoSerializer
     {
         public static string GetHeader(int indentLevel) {
             string s = "";
@@ -25,20 +25,15 @@ namespace Annostract
             return s;
         }
 
-        public static async Task<StringBuilder> Serialize(ExtractedFile file, List<ToRead> reads) {
+        public async virtual Task<StringBuilder> Serialize(ExtractedFile file, List<ToRead> reads)
+        {
             var annotations = file.Results.Select(i => Convert(i)).ToList();
 
             StringBuilder builder = new StringBuilder();
 
             var paper = await PaperFinder.PaperFinder.Find(file.FileName);
 
-            builder.Append($"## {file.FileName}");
-
-            if (!string.IsNullOrEmpty(paper?.Doi))
-            {
-                builder.Append($" [DOI](http://dx.doi.org/{paper.Doi})");
-            }
-            builder.AppendLine();
+            builder.AppendLine(GetPaperHeader(file, paper));
 
             var published = paper?.PublishedPrint?.DateParts?.FirstOrDefault()?.FirstOrDefault().ToString();
             if (!string.IsNullOrEmpty(published))
@@ -55,7 +50,7 @@ namespace Annostract
             builder.AppendLine();
 
             string abs = annotations.OfType<Abstract>().Select(i => i.ToSummary("")).CombineWithNewLine();
-            if(!string.IsNullOrEmpty(abs))
+            if (!string.IsNullOrEmpty(abs))
             {
                 builder.AppendLine(abs);
             }
@@ -67,10 +62,12 @@ namespace Annostract
             string notes = "";
             foreach (var i in annotations)
             {
-                if(i is HighlightAnnotation || i is Note || i is Indented|| i is IndentChange|| i is QuickIndent) {
+                if (i is HighlightAnnotation || i is Note || i is Indented || i is IndentChange || i is QuickIndent)
+                {
                     string indentString = "   ".Repeat(indent);
 
-                    if(i is IndentChange change) {
+                    if (i is IndentChange change)
+                    {
                         indent = change.Execute(indent);
                     }
 
@@ -99,7 +96,18 @@ namespace Annostract
             return builder;
         }
 
-        public static async Task<string> Serialize(List<ExtractedFile> extractedFiles, string originalPath)
+        internal virtual string GetPaperHeader(ExtractedFile file, CrossRefSearchResult paper)
+        {
+            var res = $"## {file.FileName}";
+
+            if (!string.IsNullOrEmpty(paper?.Doi))
+            {
+                res += $" [DOI](http://dx.doi.org/{paper.Doi})";
+            }
+            return res;
+        }
+
+        public async virtual Task<string> Serialize(List<ExtractedFile> extractedFiles, string originalPath)
         {
             var notHighlighted = extractedFiles.Where(i => i.Results.Count == 0).ToList();
 
@@ -164,7 +172,7 @@ namespace Annostract
             return res.ToString();
         }
 
-        public static Annotation Convert(Result res) {
+        public Annotation Convert(Result res) {
             return res switch {
                 HighlightResult high => Convert(high),
                 ImageResult imageResult => new ImageAnnotation(imageResult.Url),
@@ -172,13 +180,13 @@ namespace Annostract
             };
         } 
 
-        public static Annotation Convert(HighlightResult res) {
+        public virtual Annotation Convert(HighlightResult res) {
             if (res.HighlightedText == null)
             {
                 res.HighlightedText = "ERROR: THERE SHOULD BE TEXT HERE";
             }
 
-            res.HighlightedText = res.HighlightedText.Replace("[", "\\[").Replace("- ", "");
+            res.HighlightedText = res.HighlightedText.Replace("- ", "");
 
             return (res.Note?.ToLower().Trim().Replace(" ", ""), res.HighlightColor) switch
             {
