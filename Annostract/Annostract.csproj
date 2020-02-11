@@ -14,7 +14,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="ApiLibs" Version="1.43.0" />
+    <PackageReference Include="ApiLibs" Version="1.51.0" />
     <PackageReference Include="PdfClown.NetStandard" Version="0.2.0-beta" />
     <PackageReference Include="PdfPig" Version="0.0.9" />
     <PackageReference Include="Martijn.Extensions" Version="1.6.0" />
