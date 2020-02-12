@@ -17,6 +17,7 @@ using System;
 using org.pdfclown.tools;
 using Martijn.Extensions.Memory;
 using ApiLibs;
+using UglyToad.PdfPig.Core;
 
 namespace Annostract
 {
@@ -45,7 +46,7 @@ namespace Annostract
                         //     col.R.Print();
                         // }
                         var quad = (high.DataContainer.DataObject as PdfDictionary).First(i => i.Key.RawValue == "QuadPoints").Value as PdfArray;
-                        var corners = quad.OfType<PdfReal>().Select(i => new decimal(i.RawValue)).ToArray();
+                        var corners = quad.OfType<PdfReal>().Select(i => (short)i.RawValue).ToArray();
                         (int index, string highlight) = CombineWithWord(corners, file.Document.Pages.IndexOf(page) + 1, document);
 
                         if(highlight != null) {
@@ -97,7 +98,7 @@ namespace Annostract
             public Task<T> GetGist<T>(string username, string gistId, string file) => MakeRequest<T>($"{username}/{gistId}/raw/{file}");
         }
 
-        public static (int index, string word) CombineWithWord(decimal[] numberArray, int pageNumber, PdfDocument document) {
+        public static (int index, string word) CombineWithWord(short[] numberArray, int pageNumber, PdfDocument document) {
             List<PdfRectangle> rects = new List<PdfRectangle>();
             for (int i = 0; i < numberArray.Length; i += 8)
             {

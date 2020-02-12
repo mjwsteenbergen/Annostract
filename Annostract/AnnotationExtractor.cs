@@ -9,6 +9,7 @@ using System.Text.Json;
 using UglyToad.PdfPig.Tokens;
 using System.Threading.Tasks;
 using System.IO;
+using UglyToad.PdfPig.Core;
 
 namespace Annostract
 {
@@ -34,7 +35,7 @@ namespace Annostract
                             continue;
                         } 
 
-                        var numberArray = (dict["QuadPoints"] as ArrayToken).Data.OfType<NumericToken>().Select(i => i.Data).ToArray();
+                        var numberArray = (dict["QuadPoints"] as ArrayToken).Data.OfType<NumericToken>().Select(i => (short)i.Data).ToArray();
 
                         for (int i = 0; i < numberArray.Length; i += 8)
                         {
