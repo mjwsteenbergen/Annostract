@@ -60,7 +60,7 @@ namespace Annostract
                 }
 
                 Console.Write((DateTime.Now - time).TotalSeconds.ToString("F3").PadLeft(12));
-                Console.WriteLine(" Finished Extracting " + file.FileName);
+                Console.WriteLine(" Finished Extracting " + file.Title);
 
                 return file;
             }
@@ -162,21 +162,30 @@ namespace Annostract
         }
     }
 
-    public class ExtractedFile {
-        [JsonIgnore]
-        public FileInfo FilePath { get; set; }
-        public string FileName => FilePath.Name.Replace(FilePath.Extension, "");
-
-        public ExtractedFile(FileInfo filePath, string authors)
+    public abstract class ExtractedSource {
+        public ExtractedSource(string title)
         {
-            FilePath = filePath;
-            Authors = authors;
+            Title = title;
             Results = new List<Result>();
         }
 
-        public string Authors { get; set; }
-
         public List<Result> Results { get; set; }
+
+        public string Title { get; set; }
+    }
+
+    public class ExtractedFile : ExtractedSource {
+        [JsonIgnore]
+        public FileInfo FilePath { get; set; }
+        public new string Title => FilePath.Name.Replace(FilePath.Extension, "");
+
+        public ExtractedFile(FileInfo filePath, string authors) : base("")
+        {
+            FilePath = filePath;
+            Authors = authors;
+        }
+
+        public string Authors { get; set; }
     }
 
     public interface Result {}

@@ -14,8 +14,8 @@ namespace Annostract
             return base.Convert(res);
         }
 
-        internal override string GetPaperHeader(ExtractedFile file, CrossRefSearchResult paper) {
-            var res = $"## {file.FileName}";
+        internal override string GetPaperHeader(ExtractedSource file, CrossRefSearchResult paper) {
+            var res = $"## {file.Title}";
 
             if (!string.IsNullOrEmpty(paper?.Doi))
             {
@@ -24,13 +24,13 @@ namespace Annostract
             return res;
         }
 
-        public override async Task<string> Serialize(List<ExtractedFile> extractedFiles, string originalPath) {
+        public override async Task<string> Serialize(List<ExtractedSource> extractedFiles, string originalPath) {
             var start = await base.Serialize(extractedFiles, originalPath);
 
             List<CrossRefSearchResult> ress = new List<CrossRefSearchResult>();
             foreach (var item in extractedFiles)
             {
-                ress.Add(await PaperFinder.PaperFinder.Find(item.FileName));
+                ress.Add(await PaperFinder.PaperFinder.Find(item.Title));
             }
 
             start += "<md-bib>\n" + ress.Where(i => !string.IsNullOrEmpty(i?.Doi)).Select(i => $"\t<md-bib-doi id=\"{i.Doi.Replace("/", "-")}\">{i.Doi}</md-bib-doi>").CombineWithNewLine() + "\n</md-bib>";

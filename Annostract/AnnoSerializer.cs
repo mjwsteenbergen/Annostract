@@ -25,27 +25,33 @@ namespace Annostract
             return s;
         }
 
-        public async virtual Task<StringBuilder> Serialize(ExtractedFile file, List<ToRead> reads)
+        public async virtual Task<StringBuilder> Serialize(ExtractedSource file, List<ToRead> reads)
         {
             var annotations = file.Results.Select(i => Convert(i)).ToList();
 
             StringBuilder builder = new StringBuilder();
 
-            var paper = await PaperFinder.PaperFinder.Find(file.FileName);
+            if(file is ExtractedFile) {
+                var paper = await PaperFinder.PaperFinder.Find(file.Title);
 
-            builder.AppendLine(GetPaperHeader(file, paper));
+                builder.AppendLine(GetPaperHeader(file, paper));
 
-            var published = paper?.PublishedPrint?.DateParts?.FirstOrDefault()?.FirstOrDefault().ToString();
-            if (!string.IsNullOrEmpty(published))
-            {
-                builder.AppendLine($"**Published:** {published}  ");
+                var published = paper?.PublishedPrint?.DateParts?.FirstOrDefault()?.FirstOrDefault().ToString();
+                if (!string.IsNullOrEmpty(published))
+                {
+                    builder.AppendLine($"**Published:** {published}  ");
+                }
+
+                var conference = paper?.Event?.Name;
+                if (!string.IsNullOrEmpty(conference))
+                {
+                    builder.AppendLine($"**Conference:** {conference}  ");
+                }
+            } else {
+                builder.AppendLine(GetPaperHeader(file, null));
             }
 
-            var conference = paper?.Event?.Name;
-            if (!string.IsNullOrEmpty(conference))
-            {
-                builder.AppendLine($"**Conference:** {conference}  ");
-            }
+            
 
             builder.AppendLine();
 
@@ -96,9 +102,9 @@ namespace Annostract
             return builder;
         }
 
-        internal virtual string GetPaperHeader(ExtractedFile file, CrossRefSearchResult paper)
+        internal virtual string GetPaperHeader(ExtractedSource file, CrossRefSearchResult paper)
         {
-            var res = $"## {file.FileName}";
+            var res = $"## {file.Title}";
 
             if (!string.IsNullOrEmpty(paper?.Doi))
             {
@@ -107,11 +113,11 @@ namespace Annostract
             return res;
         }
 
-        public async virtual Task<string> Serialize(List<ExtractedFile> extractedFiles, string originalPath)
+        public async virtual Task<string> Serialize(List<ExtractedSource> extractedFiles, string originalPath)
         {
             var notHighlighted = extractedFiles.Where(i => i.Results.Count == 0).ToList();
 
-            var filesGroup = extractedFiles.Where(i => i.Results.Count != 0).GroupBy(i => i.FilePath.Directory.Name);
+            var filesGroup = extractedFiles.OfType<ExtractedFile>().Where(i => i.Results.Count != 0).GroupBy(i => i.FilePath.Directory.Name);
 
             List<ToRead> reads = new List<ToRead>();
 
@@ -130,8 +136,21 @@ namespace Annostract
 
             }
 
+            var instapaperArticles = extractedFiles.OfType<ExtractedInstapaperArticle>().ToList();
+
+            if(instapaperArticles.Count > 0) {
+                res.AppendLine("\n# Instapaper");
+
+                foreach (var article in instapaperArticles)
+                {
+                    res.Append(await Serialize(article, reads));
+                }
+
+            }
+
             res.AppendLine();
-            res.AppendLine("# Still to read\n" + notHighlighted.Select(i => $"- {i.FilePath.FullName.Replace(originalPath, "").Replace("[", "\\[")}").CombineWithNewLine());
+            res.AppendLine("# Still to read\n" + notHighlighted.OfType<ExtractedFile>().Select(i => $"- {i.FilePath.FullName.Replace(originalPath, "").Replace("[", "\\[")}").CombineWithNewLine());
+            res.AppendLine(notHighlighted.OfType<ExtractedInstapaperArticle>().Select(i => $"- {i.Url.Replace("[", "\\[")}").CombineWithNewLine());
             res.AppendLine();
 
             if(reads.Count > 0) {
@@ -139,9 +158,9 @@ namespace Annostract
             }
 
             var crPapers = new List<CrossRefSearchResult>();
-            foreach (var file in extractedFiles)
+            foreach (var file in extractedFiles.OfType<ExtractedFile>())
             {
-                crPapers.Add(await PaperFinder.PaperFinder.Find(file.FileName));
+                crPapers.Add(await PaperFinder.PaperFinder.Find(file.Title));
             }
 
             List<CrossRefSearchResult> papersToRead = new List<CrossRefSearchResult>();

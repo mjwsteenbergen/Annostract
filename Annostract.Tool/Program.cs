@@ -30,21 +30,25 @@ namespace Annostract
                 return;
             }
 
+           
+
             path = Path.GetFullPath(path);
             FileAttributes attr = File.GetAttributes(path);
             var isDir = attr.HasFlag(FileAttributes.Directory);
 
-            List<ExtractedFile> extractedFiles;
+            List<ExtractedSource> extractedFiles;
 
-            if(isDir) {
-                DirectoryInfo dir = new DirectoryInfo(path);
-                extractedFiles = (await ExtractRecursively(dir, dir).WhenAll()).ToList();
-            } else {
-                var file = new FileInfo(path);
-                extractedFiles = new List<ExtractedFile> {
-                    AnnotationExtractor.Extract(file.Directory, file)
-                };
-            }
+            // if(isDir) {
+            //     DirectoryInfo dir = new DirectoryInfo(path);
+            //     extractedFiles = (await ExtractRecursively(dir, dir).WhenAll()).ToList();
+            // } else {
+            //     var file = new FileInfo(path);
+            //     extractedFiles = new List<ExtractedFile> {
+            //         AnnotationExtractor.Extract(file.Directory, file)
+            //     };
+            // }
+
+            extractedFiles = (await InstapaperExtractor.Extract()).OfType<ExtractedSource>().ToList();
 
 
             var resultString = formatter switch {
