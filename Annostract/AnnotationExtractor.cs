@@ -12,6 +12,7 @@ using System.IO;
 using Martijn.Extensions.Linq;
 using System.Text.Json.Serialization;
 using UglyToad.PdfPig.DocumentLayoutAnalysis;
+using UglyToad.PdfPig.Core;
 
 namespace Annostract
 {
