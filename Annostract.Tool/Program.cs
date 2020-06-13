@@ -11,6 +11,8 @@ using UglyToad.PdfPig.Content;
 using System.Text;
 using Martijn.Extensions.AsyncLinq;
 using Martijn.Extensions.Linq;
+using Martijn.Extensions.Text;
+using System.Collections;
 
 namespace Annostract
 {
@@ -20,102 +22,69 @@ namespace Annostract
         /// Extracts annotations from pdf
         /// </summary>
         /// <param name="path">Path to pdf</param>
-        /// <param name="json">Return json instead of parsed text</param>
         /// <param name="o">Write to file</param>
-        static async Task Main(string path, bool json, bool o)
+        /// <param name="formatter">Which formatter to use (markdown(standard), markender or json)</param>
+        static async Task Main(string path, bool o, string formatter = "markdown", string? instapaper = null)
         {
-            path = Path.GetFullPath(path);
-            FileAttributes attr = File.GetAttributes(path);
-            var isDir = attr.HasFlag(FileAttributes.Directory);
+            List<Extractor> extractors = new List<Extractor>();
 
-            
-
-            if (path == null)
+            if (path != null)
             {
-                Console.WriteLine("Does not contain path. Exiting");
-                return;
+                DirectoryInfo dir = new DirectoryInfo(path);
+                extractors.Add(new AnnotationExtractor(dir.FullName));
             }
 
-            var extractedFiles = await Run(path, json, isDir, Path.GetFileName(Path.GetDirectoryName(path)) ?? "");
-
-            var resultString = "";
-
-            if (json)
+            if(instapaper != null)
             {
-                resultString = System.Text.Json.JsonSerializer.Serialize(extractedFiles, new JsonSerializerOptions()
+                extractors.Add(new InstapaperExtractor(instapaper));
+            }
+
+            var sources = await extractors.Select(i => i.Extract()).WhenAll();
+
+            "Starting to serialize".Print();
+
+            var resultString = formatter switch {
+                "markdown" => await new MarkdownSerializer().Serialize(sources.ToList()),
+                "markender" => await new MarkenderSerializer().Serialize(sources.ToList()),
+                "latex" => await new LatexSerializer().Serialize(sources.ToList()),
+                // "markdown" => await new MarkdownSerializer().Serialize(extractedFiles, path),
+                "json" => System.Text.Json.JsonSerializer.Serialize(sources, new JsonSerializerOptions()
                 {
                     WriteIndented = true
-                });
+                }),
+                _ => throw new Exception($"Invalid format {formatter}")
+            };
 
-            }
-            else
+            if (path != null && o)
             {
-                resultString = await AnnoSerializer.Serialize(extractedFiles, path);
-            }
-
-            if (o)
-            {
+                FileAttributes attr = File.GetAttributes(path);
+                var isDir = attr.HasFlag(FileAttributes.Directory);
+                
                 if (isDir)
                 {
-                    "Writing to file".ToString();
-                    await File.WriteAllTextAsync(path + "AutoLit.md", resultString);
-                }
-            }
-            else
-            {
-                Console.WriteLine(resultString);
-            }
+                    "Writing to file".Print();
 
-        }
+                    DirectoryInfo dir = new DirectoryInfo(path);
+                    string prepath = dir.FullName + Path.DirectorySeparatorChar;
 
-        public static async Task<List<ExtractedFile>> Run(string path, bool json, bool isDir, string displayPath)
-        {
-            List<string> paths = new List<string>();
-
-            FileAttributes attr = File.GetAttributes(path);
-
-            List<ExtractedFile> results = new List<ExtractedFile>();
-
-            var dirTasks = new List<Task<List<ExtractedFile>>>();
-
-            if (isDir)
-            {
-                dirTasks = Directory.GetDirectories(path).Select(dir => Run(dir, json, isDir, displayPath + "/" + Path.GetFileName(Path.GetDirectoryName(dir + "/")))).ToList();
-                paths.AddRange(Directory.GetFiles(path).Where(i => i.EndsWith(".pdf")));
-            }
-            else
-            {
-                paths.Add(path);
-            }
-
-            results = (await paths.Select(pathI => Convert(json, pathI)).WhenAll()).ToList();
-            await dirTasks.ToIAsyncEnumberable().Foreach(i => results.AddRange(i));
-
-
-
-            return results;
-        }
-
-        private static async Task<ExtractedFile> Convert(bool json, string pathI)
-        {
-            StringBuilder builder = new StringBuilder();
-
-            ExtractedFile res = null;
-
-            try
-            {
-                res = await AnnotationExtractorClown.ExtractAsync(pathI);
-            }
-            catch(Exception e)
-            {
-                try {
-                    res = AnnotationExtractor.Extract(pathI);
-                } catch(Exception ex) {
-                    
+                    var resultTask = formatter switch
+                    {
+                        "markender" => File.WriteAllTextAsync(prepath + "Annostract.md", resultString),
+                        "latex" => File.WriteAllTextAsync(prepath + "Annostract.tex", resultString),
+                        "markdown" => File.WriteAllTextAsync(prepath + "Annostract.md", resultString),
+                        "json" => File.WriteAllTextAsync(prepath + "Annostract.json", resultString),
+                        _ => throw new Exception($"Invalid format {formatter}")
+                    };
+                    await resultTask;
+                    return;
+                } 
+                else 
+                {
+                    "Don't know where to write to. Printing instead".Print();
                 }
             }
 
-            return res;
+            Console.WriteLine(resultString);
         }
     }
 }

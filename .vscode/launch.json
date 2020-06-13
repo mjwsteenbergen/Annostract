@@ -10,11 +10,11 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/Annostract.Tool/bin/Debug/netcoreapp3.1/Annostract.dll",
-            "args": ["--path", "C:\\Users\\martijn\\Dropbox\\Universiteit\\Afstuderen\\Literature\\Papers\\", "-o"],
+            "program": "${workspaceFolder}/Annostract.Tool/bin/Debug/netcoreapp3.1/Annostract.Tool.exe",
+            "args": ["--path", "C:\\Users\\martijn\\Dropbox\\Universiteit\\Afstuderen\\Literature\\", "--formatter", "markender", "-o", "--instapaper", "Thesis" ],
             "cwd": "${workspaceFolder}",
             // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
-            "console": "internalConsole",
+            "console": "integratedTerminal",
             "stopAtEntry": false
         },
         {

@@ -2,37 +2,56 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Annostract.PaperFinder.Crossref;
+using Annostract.PaperFinders.Crossref;
 using Martijn.Extensions.Memory;
 using Martijn.Extensions.Linq;
+using System.Collections.Concurrent;
+using System.Threading;
 
-namespace Annostract.PaperFinder
+namespace Annostract.PaperFinders
 {
-    public class PaperFinder
+    public static class PaperFinder
     {
-        public static async Task<CrossRefSearchResult> Find(string input)
+        private static readonly SemaphoreSlim memoryLock = new SemaphoreSlim(1);
+        private static readonly SemaphoreSlim internetLock = new SemaphoreSlim(1);
+        private static readonly SemaphoreSlim consoleLock = new SemaphoreSlim(1);
+
+        public static async Task<CrossRefSearchResult?> Find(string input)
         {
             Memory mem = new Memory()
             {
-                Application = "Annostract"
+                Application = "Annostract",
+                CreateDirectoryIfNotExists = true,
+                WriteIndented = false
             };
 
-            var dict = await mem.Read("academic-calls-crossref.json", new Dictionary<string, CrossRefSearchResult>());
+            var dict = await mem.Read("academic-calls-crossref.json", new Dictionary<string, CrossRefSearchResult?>());
 
-            var paper = await dict.GetOrCompute(input.ToLower(), async (input) =>
+            if (dict.ContainsKey(input))
             {
-                var res = (await new CrossRefService().Find(input));
+                return dict[input];
+            }
+            
+            CrossRefSearchResult? result = null;
 
-                var match = TryMatch(res, input);
-                if(match != null) {
-                    return match;
-                }
+            await internetLock.WaitAsync();
+            var res = (await new CrossRefService().Find(input));
 
+            if (TryMatch(res, input, out var result2))
+            {
+                result = result2 ?? throw new NullReferenceException();
+            }
+
+            internetLock.Release();
+
+            if(result == null)
+            {
+                await consoleLock.WaitAsync();
                 Console.WriteLine();
                 Console.WriteLine($"Which paper are you looking for? [{input}]");
                 Console.WriteLine($" [{0}] None of these");
                 int num = 1;
-                res.Select(i => i.Title?.CombineWithSpace() + " " + i.Subtitle?.CombineWithSpace()).Foreach(i =>
+                res.Select(i => i.Title?.CombineWithSpace() + " " + i.Subtitle?.CombineWithSpace()).Foreach((i) =>
                 {
                     Console.WriteLine($" [{num}] {i}");
                     num++;
@@ -53,30 +72,38 @@ namespace Annostract.PaperFinder
                     }
                 } while (chosenIndex == -100);
 
-                if(chosenIndex == 0) {
-                    return null;
+                if (chosenIndex == 0)
+                {
+                    result = null;
+                } else {
+                    result = res[chosenIndex - 1];
                 }
 
-                return res[chosenIndex-1];
-            });
+                consoleLock.Release();
+            }
 
+            await memoryLock.WaitAsync();
+            dict = await mem.Read("academic-calls-crossref.json", new Dictionary<string, CrossRefSearchResult?>());
+            dict[input] = result;
             await mem.Write("academic-calls-crossref.json", dict);
+            memoryLock.Release();
 
-            return paper;
+            return result;
         }
 
-        private static CrossRefSearchResult? TryMatch(List<CrossRefSearchResult> res, string input)
+        private static bool TryMatch(List<CrossRefSearchResult> res, string input, out CrossRefSearchResult? foundResult)
         {
             input = input.ToLower().Where(i => char.IsLetterOrDigit(i)).Select(i => i.ToString()).Combine((i, j) => $"{i}{j}");
             foreach (var result in res)
             {
                 var test = $"{result.Title?.CombineWithSpace()}{result.Subtitle?.CombineWithSpace()}".ToLower().Where(i => char.IsLetterOrDigit(i)).Select(i => i.ToString()).Combine((i, j) => $"{i}{j}");
                 if(input == test) {
-                    return result;
+                    foundResult = result;
+                    return true;
                 }
             }
-
-            return null;
+            foundResult = null;
+            return false;
         }
     }
 

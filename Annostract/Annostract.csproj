@@ -19,5 +19,7 @@
     <PackageReference Include="PdfPig" Version="0.1.1" />
     <PackageReference Include="Martijn.Extensions" Version="1.11.0" />
     <PackageReference Include="WordExtractor" Version="1.2.0" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>
+
 </Project>
