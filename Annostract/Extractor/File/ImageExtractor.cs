@@ -12,13 +12,12 @@ namespace Annostract
 
         
 
-        public static Result Extract(DirectoryInfo resourcesFolder, string filename, Page page, UglyToad.PdfPig.Annotations.Annotation anno) {
+        public static ImageNote? Extract(DirectoryInfo resourcesFolder, string filename, Page page, UglyToad.PdfPig.Annotations.Annotation anno) {
             var allImages = page.GetImages().ToList();
             var images = allImages.Where(i => anno.Rectangle.ContainedIn(i.Bounds)).ToList();
             
             resourcesFolder.CreateSubdirectory("resources");
 
-            int count = 0;
             foreach (var image in images)
             {
                 try
@@ -29,7 +28,7 @@ namespace Annostract
                         byte[] v = image.RawBytes.ToArray();
                         fs.Write(v, 0, v.Length);
                     }
-                    return new ImageResult {
+                    return new ImageNote {
                         Url = "resources" + Path.DirectorySeparatorChar + name
                     };
                 }
@@ -51,26 +50,11 @@ namespace Annostract
         {
             this.BaseUrl = BaseUrl;
         }
-
-        public override bool Equals(object obj)
-        {
-            return base.Equals(obj);
-        }
-
-        public override int GetHashCode()
-        {
-            return base.GetHashCode();
-        }
-
-        public override string ToString()
-        {
-            return base.ToString();
-        }
     }
 
-    public class ImageResult : Result
+    public class ImageNote : Note
     {
-        public string Name { get; set; }
-        public string Url { get; set; }
+        public string? Name { get; set; }
+        public string? Url { get; set; }
     }
 }

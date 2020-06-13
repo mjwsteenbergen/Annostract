@@ -10,7 +10,7 @@ using Martijn.Extensions.Linq;
 
 #pragma warning disable CS8618
 
-namespace Annostract.PaperFinder.Crossref
+namespace Annostract.PaperFinders.Crossref
 {
     public partial class CrossRefResult
     {

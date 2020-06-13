@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using ApiLibs;
 using ApiLibs.General;
 
-namespace Annostract.PaperFinder.Crossref
+namespace Annostract.PaperFinders.Crossref
 {
     class CrossRefService : Service
     {
@@ -19,7 +19,7 @@ namespace Annostract.PaperFinder.Crossref
                 new Param("query", text)
             })).Message.Items;
 
-        protected override async Task<string> HandleRequest(string url, Call call = Call.GET, List<Param> parameters = null, List<Param> headers = null, object content = null, HttpStatusCode statusCode = HttpStatusCode.OK) {
+        protected override async Task<string> HandleRequest(string url, Call call = Call.GET, List<Param>? parameters = null, List<Param>? headers = null, object? content = null, HttpStatusCode statusCode = HttpStatusCode.OK) {
             try {
                 return await base.HandleRequest(url, call, parameters, headers, content, statusCode);
             } catch(NoInternetException e) {
