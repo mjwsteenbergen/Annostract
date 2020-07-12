@@ -10,8 +10,6 @@ namespace Annostract
     {
         public string BaseUrl { get; set; }
 
-        
-
         public static ImageNote? Extract(DirectoryInfo resourcesFolder, string filename, Page page, UglyToad.PdfPig.Annotations.Annotation anno) {
             var allImages = page.GetImages().ToList();
             var images = allImages.Where(i => anno.Rectangle.ContainedIn(i.Bounds)).ToList();
@@ -23,11 +21,16 @@ namespace Annostract
                 try
                 {
                     var name = $"{filename.Replace(" ","")}.page{page.Number}.{allImages.IndexOf(image)}.jpeg";
-                    using (var fs = new FileStream(resourcesFolder.FullName + Path.DirectorySeparatorChar + "resources" + Path.DirectorySeparatorChar + name , FileMode.Create, FileAccess.Write))
+                    var newFilePath = resourcesFolder.FullName + Path.DirectorySeparatorChar + "resources" + Path.DirectorySeparatorChar + name;
+                    if(!File.Exists(newFilePath))
                     {
-                        byte[] v = image.RawBytes.ToArray();
-                        fs.Write(v, 0, v.Length);
+                        using (var fs = new FileStream(newFilePath, FileMode.Create, FileAccess.Write))
+                        {
+                            byte[] v = image.RawBytes.ToArray();
+                            fs.Write(v, 0, v.Length);
+                        }
                     }
+                    
                     return new ImageNote {
                         Url = "resources" + Path.DirectorySeparatorChar + name
                     };

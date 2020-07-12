@@ -20,12 +20,12 @@ namespace Annostract
         {
             Name = name;
             Articles = articles;
-            Bibliography = "";
+            Bibliography = new List<string>();
         }
 
         public string Name { get; set; }
 
-        public string Bibliography { get; set; }
+        public List<string> Bibliography { get; set; }
         public List<ExtractedArticle> Articles { get; set; }
     }
 

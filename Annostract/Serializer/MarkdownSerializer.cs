@@ -15,7 +15,7 @@ namespace Annostract
     public class MarkdownSerializer : Serializer
     {
 
-        public Task<string> Serialize(List<ExtractedSource> sources)
+        public virtual Task<string> Serialize(List<ExtractedSource> sources)
         {
             string result = "# Annostract\n\n";
             var content = sources.Select(i => Serialize(i)).CombineWithNewLine();

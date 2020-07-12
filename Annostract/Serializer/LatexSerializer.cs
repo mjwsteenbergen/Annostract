@@ -30,7 +30,9 @@ public class LatexSerializer : Serializer
 {(await sources.Select(i => Serialize(i)).WhenAll()).CombineWithNewLine()}
 
 \bibliographystyle{{plain}}
-\bibliography{{annostract}}
+
+{sources.SelectMany(i => i.Bibliography).Select(i => $"\\bibliography{{{i.Replace(".bib", "")}}}").CombineWithNewLine()};
+
 \end{{document}}
         ";
 
