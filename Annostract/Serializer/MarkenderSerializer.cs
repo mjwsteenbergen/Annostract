@@ -14,12 +14,27 @@ namespace Annostract {
     public class MarkenderSerializer : MarkdownSerializer
     {
 
+        public override Task<string> Serialize(List<ExtractedSource> sources)
+        {
+            string result = "# Annostract\n\n";
+            var content = sources.Select(i => Serialize(i)).CombineWithNewLine();
+            result += content;
+            result += "\n\n## Documents to read\n" + sources.SelectMany(i => i.Articles).Where(i => i.Notes.Count == 0).Select(i => 
+            (i.Path, i.Reference) switch {
+                (string p1, string r1) when string.IsNullOrEmpty(p1) && string.IsNullOrEmpty(r1)  => $" - {i.Name}",
+                (string p2, string r2) when string.IsNullOrEmpty(r2) => $" - [{i.Name}]({p2})",
+                (string p3, string r3) when string.IsNullOrEmpty(p3) => $" - {i.Name} [@{r3}]",
+                (string bp, string br) => $" - [{i.Name}]({bp}) [@{br}]",
+            }).CombineWithNewLine();
+            return Task.FromResult(result);
+        }
+
         public override string Serialize(ExtractedSource source)
         {
             var result = $"# {source.Name}\n";
             var reviews = source.Articles.Where(i => i.Notes.Count > 0).Select(i => Serialize(i)).CombineWithNewLine();
             result += reviews;
-            result += source.Bibliography;
+            result += source.Bibliography.Select(i => $"<md-bib src='./{i}'></md-bib>").CombineWithNewLine();
             return result;
         }
 

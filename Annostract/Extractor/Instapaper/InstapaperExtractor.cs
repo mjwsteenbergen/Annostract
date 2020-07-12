@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Annostract;
@@ -14,10 +15,12 @@ namespace Annostract
     public class InstapaperExtractor : Extractor
     {
         public string Folder { get; set; }
+        public string LocalFolderPath { get; }
 
-        public InstapaperExtractor(string folder)
+        public InstapaperExtractor(string folder, string localfolderPath)
         {
             Folder = folder;
+            LocalFolderPath = localfolderPath;
         }
 
         public async Task<ExtractedSource?> Extract()
@@ -57,10 +60,35 @@ namespace Annostract
                 };
             });
 
+            List<string> bib = new List<string>();
+            if(LocalFolderPath != null)
+            {
+                var biber = bminfo.bookmarks.Select(i => $@"
+@misc{{{i.bookmark_id},title = {{{i.title}}}, 
+	url         = {{{i.url}}}, 
+	author      = {{{ParseAuthor(i.url)}}}, 
+	year        = {{{DateTime.Now.Year}}}, 
+	note        = {{(Accessed on {DateTime.Now.ToString()})}}
+}}").CombineWithNewLine();
+                File.WriteAllText(LocalFolderPath + "Annostract.Instapaper.bib", biber);
+                bib.Add("Annostract.Instapaper.bib");
+                // "<md-bib>\n" + bminfo.bookmarks.Select(i => $"\t<md-bib-url id=\"{i.bookmark_id}\">{i.url}</md-bib-url>").CombineWithNewLine() + "\n<md-bib/>"
+            }
+
             return new ExtractedSource("Instapaper", arts.ToList())
             {
-                Bibliography = "<md-bib>\n" + bminfo.bookmarks.Select(i => $"\t<md-bib-url id=\"{i.bookmark_id}\">{i.url}</md-bib-url>").CombineWithNewLine() + "\n<md-bib/>"
+                Bibliography = bib
             };
+        }
+
+        private object ParseAuthor(string url)
+        {
+            if(url != null && Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            {
+                return uri.Host;
+            }
+
+            return "";
         }
     }
 }

@@ -32,7 +32,7 @@ namespace Annostract.PaperFinders
                 }
 
                 var contents = res.Select(i => Regex.Replace(i.Item2, "(@[^\\{]+\\{)[^,]+", "$1" + SourceToBibDoiId(i.Item1))).CombineWithNewLine();
-                File.WriteAllText(path + "Annostract.bib", contents);
+                File.WriteAllText(path, contents);
             } 
             catch(NoInternetException)
             {

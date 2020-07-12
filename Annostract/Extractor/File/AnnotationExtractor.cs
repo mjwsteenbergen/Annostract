@@ -54,7 +54,7 @@ namespace Annostract {
             return tasks.Concat(folder.EnumerateDirectories().SelectMany(i => ExtractRecursively(i, baseDir)));
         }
 
-        public async Task<string> Bibliography(ExtractedSource source)
+        public async Task<List<string>> Bibliography(ExtractedSource source)
         {
             var files = (await source.Articles.Select(async article =>
             {
@@ -67,31 +67,30 @@ namespace Annostract {
             List<(ToRead, CrossRefSearchResult)> papers = reads.Where(i => i.Item2 != null && !files.Any(j => j.Item2?.Doi == i.Item2?.Doi)).ToList();
             var unknowns = reads.Where(i => i.Item2 == null);
 
+            papers.Select(i => i.Item2).OrderByDescending(i => i.IsReferencedByCount).Foreach(paper => source.Articles.Add(new ExtractedArticle(paper.Link?.FirstOrDefault(i => i.IsPdf())?.Url?.AbsoluteUri ?? $"http://dx.doi.org/{paper.Doi}") {
+                Abstract = paper.Abstract,
+                Name = paper.Title?.CombineWithSpace() + " " + paper.Subtitle?.CombineWithSpace(),
+                Reference = SourceToBibDoiId(paper)
+            }));
 
-            var result = "\n\n## Future reading material\n";
-            result += "\n\n### Papers to read\n";
-            result += papers.Select(i => i.Item2).OrderByDescending(i => i.IsReferencedByCount).Select(paper => $" - [{paper.Title?.CombineWithSpace() + " " + paper.Subtitle?.CombineWithSpace()}]({paper.Link?.FirstOrDefault(i => i.IsPdf())?.Url?.AbsoluteUri ?? $"http://dx.doi.org/{paper.Doi}"}) ({paper.Created?.DateTime.Year}, {paper.IsReferencedByCount}, [@{SourceToBibDoiId(paper)}])").CombineWithNewLine();
-            result += unknowns.Select(i => i.i).Select(i => $" - {i.Content}").CombineWithNewLine();
-
-            result += "\n\n";
+            unknowns.Select(i => i.i).Foreach(i => source.Articles.Add(new ExtractedArticle("") {
+                Name = i.Content
+            }));
 
 
 
-            if (ExtractPath == null)
+
+            if (ExtractPath != null)
             {
-                result += $"<md-bib>\n";
-                result += files.Select(i => i.Item2).Concat(papers.Select(i => i.Item2)).Select(i => $"\t<md-bib-doi id=\"{SourceToBibDoiId(i)}\">{i.Doi}</md-bib-doi>").CombineWithNewLine();
-            }
-            else
-            {
-                result += $"<md-bib src=\"Annostract.bib\">\n";
-                result += papers.Select(i => i.Item2).Select(i => $"\t<md-bib-doi id=\"{SourceToBibDoiId(i)}\">{i.Doi}</md-bib-doi>").CombineWithNewLine();
-                await BibtexMaker.CreateBibtex(ExtractPath, files.Select(i => i.Item2).ToList());
+                await BibtexMaker.CreateBibtex(ExtractPath + "Annostract.Files.bib", files.Select(i => i.Item2).ToList());
+                await BibtexMaker.CreateBibtex(ExtractPath + "Annostract.FutureReading.bib", papers.Select(i => i.Item2).ToList());
             }
 
-            result += $"</md-bib>\n";
 
-            return result;
+            return new List<string> {
+                "Annostract.Files.bib",
+                "Annostract.FutureReading.bib"
+            };
         }
     }
 }
