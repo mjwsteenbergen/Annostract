@@ -14,7 +14,7 @@ namespace Annostract.PaperFinders
     {
         private static readonly SemaphoreSlim memoryLock = new SemaphoreSlim(1);
         private static readonly SemaphoreSlim internetLock = new SemaphoreSlim(1);
-        private static readonly SemaphoreSlim consoleLock = new SemaphoreSlim(1);
+        public static readonly SemaphoreSlim consoleLock = new SemaphoreSlim(1);
 
         public static async Task<CrossRefSearchResult?> Find(string input)
         {

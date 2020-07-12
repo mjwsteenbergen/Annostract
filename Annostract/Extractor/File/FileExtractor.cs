@@ -78,7 +78,9 @@ namespace Annostract
                     Console.WriteLine(e.StackTrace);
                 }
 
+                await PaperFinder.consoleLock.WaitAsync();
                 Console.WriteLine((DateTime.Now - time).TotalSeconds.ToString("F3").PadLeft(12) + " Finished Extracting " + file.Name);
+                PaperFinder.consoleLock.Release();
 
                 file.Notes = file.Notes.Where(i => i != null).ToList();
 

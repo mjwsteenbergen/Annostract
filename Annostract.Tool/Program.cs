@@ -3,16 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Linq;
-using UglyToad.PdfPig;
-using ApiLibs.General;
 using System.Threading.Tasks;
-using UglyToad.PdfPig.Geometry;
-using UglyToad.PdfPig.Content;
-using System.Text;
 using Martijn.Extensions.AsyncLinq;
-using Martijn.Extensions.Linq;
 using Martijn.Extensions.Text;
-using System.Collections;
 
 namespace Annostract
 {
@@ -28,15 +21,17 @@ namespace Annostract
         {
             List<Extractor> extractors = new List<Extractor>();
 
+            string? dirName = null;
             if (path != null)
             {
                 DirectoryInfo dir = new DirectoryInfo(path);
-                extractors.Add(new AnnotationExtractor(dir.FullName));
+                dirName = dir.FullName;
+                extractors.Add(new AnnotationExtractor(dirName));
             }
 
             if(instapaper != null)
             {
-                extractors.Add(new InstapaperExtractor(instapaper));
+                extractors.Add(new InstapaperExtractor(instapaper, dirName));
             }
 
             var sources = await extractors.Select(i => i.Extract()).WhenAll();
@@ -47,7 +42,6 @@ namespace Annostract
                 "markdown" => await new MarkdownSerializer().Serialize(sources.ToList()),
                 "markender" => await new MarkenderSerializer().Serialize(sources.ToList()),
                 "latex" => await new LatexSerializer().Serialize(sources.ToList()),
-                // "markdown" => await new MarkdownSerializer().Serialize(extractedFiles, path),
                 "json" => System.Text.Json.JsonSerializer.Serialize(sources, new JsonSerializerOptions()
                 {
                     WriteIndented = true
