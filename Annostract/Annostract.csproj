@@ -17,7 +17,7 @@
     <PackageReference Include="ApiLibs" Version="1.54.0" />
     <PackageReference Include="PdfClown.NetStandard" Version="0.2.0-beta" />
     <PackageReference Include="PdfPig" Version="0.1.2" />
-    <PackageReference Include="Martijn.Extensions" Version="1.11.0" />
+    <PackageReference Include="Martijn.Extensions" Version="1.13.0" />
     <PackageReference Include="WordExtractor" Version="1.2.0" />
     <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>

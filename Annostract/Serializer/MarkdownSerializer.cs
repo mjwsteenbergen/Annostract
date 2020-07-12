@@ -90,34 +90,4 @@ namespace Annostract
             return input;
         }
     }
-
-    public static class LinqExtensions {
-        public static IEnumerable<T> Distinct<T>(this IEnumerable<T> IEnumerable, Func<T, T, bool> equals, Func<T, int> hash)
-        {
-            return IEnumerable.Distinct(new Comparerr<T>(equals, hash));
-        }
-
-        public class Comparerr<T> : IEqualityComparer<T>
-        {
-            private readonly Func<T, T, bool> equals;
-            private readonly Func<T, int> hash;
-
-            public Comparerr(Func<T, T, bool> equals, Func<T, int> hash)
-            {
-                this.equals = equals;
-                this.hash = hash;
-            }
-
-            public bool Equals(T x, T y)
-            {
-                return equals(x, y);
-            }
-
-            public int GetHashCode(T obj)
-            {
-                return hash(obj);
-            }
-        }
-    }
-
 }
