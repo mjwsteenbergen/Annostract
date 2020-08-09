@@ -18,16 +18,16 @@ namespace Annostract
         public virtual Task<string> Serialize(List<ExtractedSource> sources)
         {
             string result = "# Annostract\n\n";
-            var content = sources.Select(i => Serialize(i)).CombineWithNewLine();
+            var content = sources.Select(i => Serialize(i)).Combine("\n");
             result += content;
-            result += "\n\n## Documents to read\n" + sources.SelectMany(i => i.Articles).Where(i => i.Notes.Count == 0).Select(i => $" - <a href=\"{i.Path}\">{i.Name}<a/>").CombineWithNewLine();
+            result += "\n\n## Documents to read\n" + sources.SelectMany(i => i.Articles).Where(i => i.Notes.Count == 0).Select(i => $" - <a href=\"{i.Path}\">{i.Name}<a/>").Combine("\n");
             return Task.FromResult(result);
         }
 
         public virtual string Serialize(ExtractedSource source)
         {
             var result = $"# {source.Name}\n";
-            var reviews = source.Articles.Where(i => i.Notes.Count > 0).Select(i => Serialize(i)).CombineWithNewLine();
+            var reviews = source.Articles.Where(i => i.Notes.Count > 0).Select(i => Serialize(i)).Combine("\n");
             result += reviews;
             return result;
         }
@@ -52,7 +52,7 @@ namespace Annostract
             {
                 return "";
             }
-            return "\n\n### Images\n" + images.Distinct((i, j) => i.Url == j.Url, (i) => i.Url.GetHashCode()).Select(i => $"![{i.Name}]({i.Url})").CombineWithNewLine();
+            return "\n\n### Images\n" + images.Distinct((i, j) => i.Url == j.Url, (i) => i.Url.GetHashCode()).Select(i => $"![{i.Name}]({i.Url})").Combine("\n");
         }
 
         internal string Serialize(IEnumerable<Quote> quotes, string eolReference)
@@ -61,7 +61,7 @@ namespace Annostract
             {
                 return "";
             }
-            return "\n\n### Quotes\n" + quotes.Select(i => $"\"{i.Content}\"{eolReference}").CombineWithNewLine();
+            return "\n\n### Quotes\n" + quotes.Select(i => $"\"{i.Content}\"{eolReference}").Combine("\n");
         }
 
         internal string Serialize(IEnumerable<TreeNote> notes, string eolReference)
@@ -70,12 +70,12 @@ namespace Annostract
             {
                 return "";
             }
-            return "\n\n### Takeaways\n" + notes.Select(i => Serialize(i, 0, eolReference)).CombineWithNewLine();
+            return "\n\n### Takeaways\n" + notes.Select(i => Serialize(i, 0, eolReference)).Combine("\n");
         }
 
         internal string Serialize(TreeNote n, int indent, string eolReference)
         {
-            return " ".Repeat(indent * 3) + " - " + n.Content + eolReference + (n.Children.Count > 0 ? "\n" : "") + n.Children.Select(i => Serialize(i, indent + 1, eolReference)).CombineWithNewLine();
+            return " ".Repeat(indent * 3) + " - " + n.Content + eolReference + (n.Children.Count > 0 ? "\n" : "") + n.Children.Select(i => Serialize(i, indent + 1, eolReference)).Combine("\n");
         }
     }
     public static class TelegramServiceExtension

@@ -69,10 +69,10 @@ namespace Annostract
 	author      = {{{ParseAuthor(i.url)}}}, 
 	year        = {{{DateTime.Now.Year}}}, 
 	note        = {{(Accessed on {DateTime.Now.ToString()})}}
-}}").CombineWithNewLine();
+}}").Combine("\n");
                 File.WriteAllText(LocalFolderPath + "Annostract.Instapaper.bib", biber);
                 bib.Add("Annostract.Instapaper.bib");
-                // "<md-bib>\n" + bminfo.bookmarks.Select(i => $"\t<md-bib-url id=\"{i.bookmark_id}\">{i.url}</md-bib-url>").CombineWithNewLine() + "\n<md-bib/>"
+                // "<md-bib>\n" + bminfo.bookmarks.Select(i => $"\t<md-bib-url id=\"{i.bookmark_id}\">{i.url}</md-bib-url>").Combine("\n") + "\n<md-bib/>"
             }
 
             return new ExtractedSource("Instapaper", arts.ToList())

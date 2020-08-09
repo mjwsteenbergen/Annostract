@@ -69,7 +69,7 @@ namespace Annostract {
 
             papers.Select(i => i.Item2).OrderByDescending(i => i.IsReferencedByCount).Foreach(paper => source.Articles.Add(new ExtractedArticle(paper.Link?.FirstOrDefault(i => i.IsPdf())?.Url?.AbsoluteUri ?? $"http://dx.doi.org/{paper.Doi}") {
                 Abstract = paper.Abstract,
-                Name = paper.Title?.CombineWithSpace() + " " + paper.Subtitle?.CombineWithSpace(),
+                Name = paper.Title?.Combine(" ") + " " + paper.Subtitle?.Combine(" "),
                 Reference = SourceToBibDoiId(paper)
             }));
 

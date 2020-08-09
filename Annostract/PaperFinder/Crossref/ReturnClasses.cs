@@ -86,7 +86,7 @@ namespace Annostract.PaperFinders.Crossref
         public override bool Equals(object obj)
         {
             if(obj != null && obj is CrossRefSearchResult other) {
-                return (this.Doi ?? this.Issn?.FirstOrDefault() ?? this.Isbn?.FirstOrDefault() ?? this.Title?.CombineWithSpace() ?? "HOW") == (other.Doi ?? other.Issn?.FirstOrDefault() ?? other.Isbn?.FirstOrDefault() ?? other.Title?.CombineWithSpace() ?? "HOW");
+                return (this.Doi ?? this.Issn?.FirstOrDefault() ?? this.Isbn?.FirstOrDefault() ?? this.Title?.Combine(" ") ?? "HOW") == (other.Doi ?? other.Issn?.FirstOrDefault() ?? other.Isbn?.FirstOrDefault() ?? other.Title?.Combine(" ") ?? "HOW");
             }
             return false;
         }
@@ -94,7 +94,7 @@ namespace Annostract.PaperFinders.Crossref
         // override object.GetHashCode
         public override int GetHashCode()
         {
-            return (this.Doi ?? this.Issn?.FirstOrDefault() ?? this.Isbn?.FirstOrDefault() ?? this.Title?.CombineWithSpace() ?? "HOW").GetHashCode();
+            return (this.Doi ?? this.Issn?.FirstOrDefault() ?? this.Isbn?.FirstOrDefault() ?? this.Title?.Combine(" ") ?? "HOW").GetHashCode();
         }
     }
 
