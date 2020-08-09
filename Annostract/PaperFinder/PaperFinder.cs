@@ -51,7 +51,7 @@ namespace Annostract.PaperFinders
                 Console.WriteLine($"Which paper are you looking for? [{input}]");
                 Console.WriteLine($" [{0}] None of these");
                 int num = 1;
-                res.Select(i => i.Title?.CombineWithSpace() + " " + i.Subtitle?.CombineWithSpace()).Foreach((i) =>
+                res.Select(i => i.Title?.Combine(" ") + " " + i.Subtitle?.Combine(" ")).Foreach((i) =>
                 {
                     Console.WriteLine($" [{num}] {i}");
                     num++;
@@ -96,7 +96,7 @@ namespace Annostract.PaperFinders
             input = input.ToLower().Where(i => char.IsLetterOrDigit(i)).Select(i => i.ToString()).Combine((i, j) => $"{i}{j}");
             foreach (var result in res)
             {
-                var test = $"{result.Title?.CombineWithSpace()}{result.Subtitle?.CombineWithSpace()}".ToLower().Where(i => char.IsLetterOrDigit(i)).Select(i => i.ToString()).Combine((i, j) => $"{i}{j}");
+                var test = $"{result.Title?.Combine(" ")}{result.Subtitle?.Combine(" ")}".ToLower().Where(i => char.IsLetterOrDigit(i)).Select(i => i.ToString()).Combine((i, j) => $"{i}{j}");
                 if(input == test) {
                     foundResult = result;
                     return true;

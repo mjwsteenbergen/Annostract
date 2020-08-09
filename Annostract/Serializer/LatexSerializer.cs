@@ -27,11 +27,11 @@ public class LatexSerializer : Serializer
 
 \maketitle
 
-{(await sources.Select(i => Serialize(i)).WhenAll()).CombineWithNewLine()}
+{(await sources.Select(i => Serialize(i)).WhenAll()).Combine("\n")}
 
 \bibliographystyle{{plain}}
 
-{sources.SelectMany(i => i.Bibliography).Select(i => $"\\bibliography{{{i.Replace(".bib", "")}}}").CombineWithNewLine()};
+{sources.SelectMany(i => i.Bibliography).Select(i => $"\\bibliography{{{i.Replace(".bib", "")}}}").Combine("\n")};
 
 \end{{document}}
         ";
@@ -42,7 +42,7 @@ public class LatexSerializer : Serializer
     private Task<string> Serialize(ExtractedSource source)
     {
         string result = $"\\section{{{source.Name}}}\n";
-        var reviews = source.Articles.Where(i => i.Notes.Count > 0).Select(i => Serialize(i)).CombineWithNewLine();
+        var reviews = source.Articles.Where(i => i.Notes.Count > 0).Select(i => Serialize(i)).Combine("\n");
 
         return Task.FromResult(result + reviews);
     }
@@ -74,7 +74,7 @@ public class LatexSerializer : Serializer
 \includegraphics[scale=1.7]{{{i.Url}}}
 \caption{{{i.Name}}}
 \label{{fig:{i.Name}}}
-\end{{figure}}").CombineWithNewLine();
+\end{{figure}}").Combine("\n");
     }
 
     private object Serialize(IEnumerable<Quote> quotes, string eolReference)
@@ -83,7 +83,7 @@ public class LatexSerializer : Serializer
         {
             return "";
         }
-        return "\n\n\\subsubsection{{Quotes}}\n" + quotes.Select(i => $@"\epigraph{{{i.Content}}}{{\textit{{{eolReference}}}").CombineWithNewLine();
+        return "\n\n\\subsubsection{{Quotes}}\n" + quotes.Select(i => $@"\epigraph{{{i.Content}}}{{\textit{{{eolReference}}}").Combine("\n");
     }
 
     private string Serialize(IEnumerable<TreeNote> notes, string eolReference)
@@ -95,7 +95,7 @@ public class LatexSerializer : Serializer
     var res = "";
     res += "\\begin{itemize}\n";
     res += "\\tightlist\n";
-    res += notes.Select(i => Serialize(i, 0, eolReference)).CombineWithNewLine();
+    res += notes.Select(i => Serialize(i, 0, eolReference)).Combine("\n");
     res += "\n\\end{itemize}";
     return "\n\n\\subsubsection{{Takeaways}}\n" + res;
 }
@@ -107,7 +107,7 @@ public class LatexSerializer : Serializer
         {
             res += "\n" + " ".Repeat(indent * 3) + "\\begin{itemize}\n";
             res += " ".Repeat(indent * 3) + "\\tightlist\n";
-            res += n.Children.Select(i => Serialize(i, indent + 1, eolReference)).CombineWithNewLine();
+            res += n.Children.Select(i => Serialize(i, indent + 1, eolReference)).Combine("\n");
             res += "\n" + " ".Repeat(indent * 3) + "\\end{itemize}";
         }
 

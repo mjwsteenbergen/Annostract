@@ -31,7 +31,7 @@ namespace Annostract.PaperFinders
                     res.Add((item, await downloader.Get(item.Doi)));
                 }
 
-                var contents = res.Select(i => Regex.Replace(i.Item2, "(@[^\\{]+\\{)[^,]+", "$1" + SourceToBibDoiId(i.Item1))).CombineWithNewLine();
+                var contents = res.Select(i => Regex.Replace(i.Item2, "(@[^\\{]+\\{)[^,]+", "$1" + SourceToBibDoiId(i.Item1))).Combine("\n");
                 File.WriteAllText(path, contents);
             } 
             catch(NoInternetException)
