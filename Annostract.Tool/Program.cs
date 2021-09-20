@@ -11,13 +11,14 @@ using UglyToad.PdfPig.Content;
 using System.Text;
 using Martijn.Extensions.AsyncLinq;
 using Martijn.Extensions.Linq;
+using Martijn.Extensions.Text;
 
 namespace Annostract
 {
     class Program
     {
         /// <summary>
-        /// Extracts annotations from pdf
+        /// Extracts annotations from pdf files
         /// </summary>
         /// <param name="path">Path to pdf</param>
         /// <param name="o">Write to file</param>
@@ -36,20 +37,21 @@ namespace Annostract
             FileAttributes attr = File.GetAttributes(path);
             var isDir = attr.HasFlag(FileAttributes.Directory);
 
-            List<ExtractedSource> extractedFiles;
+            List<ExtractedDocument> extractedFiles = new List<ExtractedDocument>();
 
-            // if(isDir) {
-            //     DirectoryInfo dir = new DirectoryInfo(path);
-            //     extractedFiles = (await ExtractRecursively(dir, dir).WhenAll()).ToList();
-            // } else {
-            //     var file = new FileInfo(path);
-            //     extractedFiles = new List<ExtractedFile> {
-            //         AnnotationExtractor.Extract(file.Directory, file)
-            //     };
-            // }
+            if(isDir) {
+                DirectoryInfo dir = new DirectoryInfo(path);
+                extractedFiles.AddRange((await ExtractRecursively(dir, dir).WhenAll()).ToList());
+            } else {
+                var file = new FileInfo(path);
+                extractedFiles = new List<ExtractedDocument> {
+                    await AnnotationExtractor.Extract(file.Directory, file)
+                };
+            }
 
-            extractedFiles = (await InstapaperExtractor.Extract()).OfType<ExtractedSource>().ToList();
+            extractedFiles.AddRange((await InstapaperExtractor.Extract()).OfType<ExtractedDocument>().ToList());
 
+            "Starting to serialize".Print();
 
             var resultString = formatter switch {
                 "markender" => await new MarkenderSerializer().Serialize(extractedFiles, path),
@@ -65,8 +67,8 @@ namespace Annostract
             {
                 if (isDir)
                 {
-                    "Writing to file".ToString();
-                    await File.WriteAllTextAsync(path + "AutoLit.md", resultString);
+                    "Writing to file".Print();
+                    await File.WriteAllTextAsync(path + "Annostract.md", resultString);
                 }
             }
             else
@@ -79,7 +81,7 @@ namespace Annostract
 
         public static IEnumerable<Task<ExtractedFile>> ExtractRecursively(DirectoryInfo folder, DirectoryInfo baseDir)
         {
-            var tasks = folder.EnumerateFiles().Where(i => i.Extension == ".pdf").Select(i => Task.Factory.StartNew(() => AnnotationExtractor.Extract(baseDir, i)));
+            var tasks = folder.EnumerateFiles().Where(i => i.Extension == ".pdf").Select(i => AnnotationExtractor.Extract(baseDir, i));
 
             return tasks.Concat(folder.EnumerateDirectories().SelectMany(i => ExtractRecursively(i, baseDir)));
         }

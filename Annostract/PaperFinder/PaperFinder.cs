@@ -10,7 +10,7 @@ namespace Annostract.PaperFinder
 {
     public class PaperFinder
     {
-        public static async Task<CrossRefSearchResult> Find(string input)
+        public static async Task<CrossRefSearchResult> FindPaper(string input)
         {
             Memory mem = new Memory()
             {

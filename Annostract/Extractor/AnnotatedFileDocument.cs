@@ -5,28 +5,50 @@ using UglyToad.PdfPig;
 using UglyToad.PdfPig.Annotations;
 using UglyToad.PdfPig.Content;
 using UglyToad.PdfPig.Geometry;
-using System.Text.Json;
 using UglyToad.PdfPig.Tokens;
 using System.Threading.Tasks;
 using System.IO;
 using Martijn.Extensions.Linq;
-using System.Text.Json.Serialization;
 using UglyToad.PdfPig.DocumentLayoutAnalysis;
 using UglyToad.PdfPig.Core;
+using Martijn.Extensions.Memory;
+using System.Security.Cryptography;
+using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
-namespace Annostract
+namespace Annostract.Extractor
 {
-    public static class AnnotationExtractor
+    public class AnnotatedFileDocument : IAnnotatedDocument
     {
-        public static ExtractedFile Extract(DirectoryInfo baseDir, FileInfo pdfFile)
+        public DirectoryInfo BaseDir { get; }
+        public FileInfo PdfFile { get; }
+
+        public AnnotatedFileDocument(DirectoryInfo baseDir, FileInfo pdfFile)
+        {
+            BaseDir = baseDir;
+            PdfFile = pdfFile;
+        }
+
+        public Task<ExtractedDocument> Extract()
+        {
+            return new Memory()
+            {
+                Application = "Annostract" + Path.DirectorySeparatorChar + "cache", 
+                CreateDirectoryIfNotExists = true
+            }.ReadOrCalculate<ExtractedDocument>(PdfFile.Name + "-" + CalculateMD5(PdfFile.FullName) + ".json", () => RunExtraction());
+        }
+
+        private ExtractedFile RunExtraction()
         {
             ExtractedFile file = null;
-            using (PdfDocument document = PdfDocument.Open(pdfFile.FullName))
+            using (PdfDocument document = PdfDocument.Open(PdfFile.FullName))
             {
                 DateTime time = DateTime.Now;
-                
-                file = new ExtractedFile(pdfFile, document.Information.Author);
-                try {
+
+                file = new ExtractedFile(PdfFile, document.Information.Author);
+                try
+                {
                     foreach (var page in document.GetPages())
                     {
                         string? allText = null;
@@ -37,7 +59,8 @@ namespace Annostract
                         var annos = page.ExperimentalAccess.GetAnnotations();
                         foreach (var annotation in annos.Where(i => i.Type == AnnotationType.Highlight || i.Type == AnnotationType.Ink))
                         {
-                            if(allText == null || words == null) {
+                            if (allText == null || words == null)
+                            {
                                 allText = page.Text;
                                 words = page.GetWords(new NearestNeighbourWordExtractor());
                             }
@@ -45,7 +68,7 @@ namespace Annostract
                             var result = annotation.Type switch
                             {
                                 AnnotationType.Highlight => ExtractHighlight(annotation, page, allText, words),
-                                AnnotationType.Ink => ImageExtractor.Extract(baseDir, pdfFile.Name, page, annotation),
+                                AnnotationType.Ink => ExtractImage(BaseDir, PdfFile.Name, page, annotation),
                                 _ => null
                             };
 
@@ -55,7 +78,9 @@ namespace Annostract
                             }
                         }
                     }
-                } catch (Exception e) {
+                }
+                catch (Exception e)
+                {
                     Console.WriteLine(e.Message);
                 }
 
@@ -79,29 +104,18 @@ namespace Annostract
 
             for (int i = 0; i < numberArray.Length; i += 8)
             {
-                rects.Add(new PdfRectangle(numberArray[i + 0], numberArray[i + 1], numberArray[i + 6], numberArray[i + 7]));
+                rects.Add(new PdfRectangle((double)(numberArray[i + 0]), (double)(numberArray[i + 1]), (double)(numberArray[i + 6]), (double)(numberArray[i + 7])));
             }
 
             string text = "";
             List<decimal> avgs = new List<decimal>();
             int counter = 0;
             
-            foreach ((Word word, string actualText) in FixText(allText, words))
+            foreach ((Word word, string actualText) in words.Select(i => (i, i.Text)))
             {
-                if (rects.Any(rect => word.BoundingBox.ContainedIn(rect)))
+                if (rects.Any(rect => rect.Contains(word.BoundingBox)))
                 {
-                    var letters = word.Letters.Select(i => (content: i.Value, br: i.StartBaseLine.X + i.Width, bl: i.StartBaseLine.X)).ToList();
-                    List<string> chars = new List<string> {
-                        letters[0].content
-                    };
-
-                    var actactualText = actualText;
-
-                    if(actualText.Length != word.Text.Length) {
-                        actactualText = word.Text;
-                    }
-
-                    text += actactualText + " ";
+                    text += word.Text.Trim() + " ";
                 }
                 counter += word.Text.Length;
             }
@@ -116,6 +130,39 @@ namespace Annostract
 
             //, AnnoSerializer.Convert(annotation.)
             return new HighlightResult(text, annotation.Content, ColorConverter.Convert((double)color[0].Data, (double) color[1].Data, (double) color[2].Data));
+        }
+
+        public static Result ExtractImage(DirectoryInfo resourcesFolder, string filename, Page page, UglyToad.PdfPig.Annotations.Annotation anno)
+        {
+            var allImages = page.GetImages().ToList();
+            var images = allImages.Where(i => anno.Rectangle.ContainedIn(i.Bounds)).ToList();
+
+            resourcesFolder.CreateSubdirectory("resources");
+
+            int count = 0;
+            foreach (var image in images)
+            {
+                try
+                {
+                    var name = $"{filename.Replace(" ", "")}.page{page.Number}.{allImages.IndexOf(image)}.jpeg";
+                    using (var fs = new FileStream(resourcesFolder.FullName + Path.DirectorySeparatorChar + "resources" + Path.DirectorySeparatorChar + name, FileMode.Create, FileAccess.Write))
+                    {
+                        byte[] v = image.RawBytes.ToArray();
+                        fs.Write(v, 0, v.Length);
+                    }
+                    return new ImageResult
+                    {
+                        Url = "resources" + Path.DirectorySeparatorChar + name
+                    };
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Exception caught in process: {0}", ex);
+                }
+            }
+            // Console.WriteLine($"WARN: No image found for ink on page {page.Number}");
+
+            return null;
         }
 
         private static List<(Word w, string actualText)> FixText(string allText, IEnumerable<Word> words)
@@ -160,51 +207,22 @@ namespace Annostract
         {
             return allText.Substring(counter, text.Length);
         }
-    }
 
-    public abstract class ExtractedSource {
-        public ExtractedSource(string title)
+        //https://stackoverflow.com/questions/10520048/calculate-md5-checksum-for-a-file
+        static string CalculateMD5(string filename)
         {
-            Title = title;
-            Results = new List<Result>();
+            using (var md5 = MD5.Create())
+            {
+                using (var stream = File.OpenRead(filename))
+                {
+                    var hash = md5.ComputeHash(stream);
+                    return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
+                }
+            }
         }
-
-        public List<Result> Results { get; set; }
-
-        public string Title { get; set; }
     }
 
-    public class ExtractedFile : ExtractedSource {
-        [JsonIgnore]
-        public FileInfo FilePath { get; set; }
-        public new string Title => FilePath.Name.Replace(FilePath.Extension, "");
-
-        public ExtractedFile(FileInfo filePath, string authors) : base("")
-        {
-            FilePath = filePath;
-            Authors = authors;
-        }
-
-        public string Authors { get; set; }
-    }
-
-    public interface Result {}
-
-    public class HighlightResult : Result
-    {
-        public HighlightResult(string highlight, string note, HighlightColor color = HighlightColor.Unknown)
-        {
-            this.HighlightedText = highlight;
-            this.Note = note;
-            this.HighlightColor = color;
-        }
-
-        public string HighlightedText { get; set; }
-
-        public HighlightColor HighlightColor { get; set; }
-
-        public string Note { get; set; }
-    }
+    
 
     public static class ColorConverter {
 
@@ -229,13 +247,13 @@ namespace Annostract
     {
         public static bool ContainedIn(this PdfRectangle word, PdfRectangle highlightBox)
         {
+            // return (word.BottomRight.X >= highlightBox.BottomLeft.X && word.BottomLeft.Y >= highlightBox.BottomLeft.Y) &&
+            // (word.BottomLeft.X <= highlightBox.TopRight.X && word.TopRight.Y <= highlightBox.TopRight.Y);
             var avgWordY = (word.BottomRight.Y + word.TopLeft.Y) / 2;
-            // return (mine.BottomRight.X >= other.BottomLeft.X && mine.BottomLeft.Y >= other.BottomLeft.Y) &&
-            // (mine.BottomLeft.X <= other.TopRight.X && mine.TopRight.Y <= other.TopRight.Y);
-            return
-            highlightBox.BottomRight.Y <= avgWordY + (highlightBox.Height/10) && highlightBox.TopLeft.Y >= avgWordY - (highlightBox.Height/10) &&
-                XTest(highlightBox, word.Centroid);
-                // && highlightBox.Contains(word.Centroid);
+            // return highlightBox.BottomRight.Y <= avgWordY + (highlightBox.Height/10)
+                // && highlightBox.TopLeft.Y >= avgWordY - (highlightBox.Height/10);
+            // return XTest(highlightBox, word.Centroid);
+            return highlightBox.Contains(word.Centroid);
             // return highlightBox.Contains(word.BottomLeft) || highlightBox.Contains(word.BottomRight) || highlightBox.Contains(word.TopLeft) || highlightBox.Contains(word.TopRight);
         }
 
@@ -246,8 +264,13 @@ namespace Annostract
 
         public static bool Contains(this PdfRectangle rect, PdfPoint point)
         {
-            return (rect.BottomLeft.X <= point.X && rect.BottomLeft.Y <= point.Y) &&
-                (rect.TopRight.X >= point.X && rect.TopRight.Y >= point.Y);
+            return (rect.Left <= point.X && rect.Bottom <= point.Y) &&
+                (rect.Right >= point.X && rect.Top >= point.Y);
+        }
+
+        public static bool Contains(this PdfRectangle biggerRect, PdfRectangle smallerRect)
+        {
+            return biggerRect.Contains(smallerRect.Centroid);
         }
     }
 }

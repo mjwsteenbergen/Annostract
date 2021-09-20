@@ -38,7 +38,7 @@ namespace Annostract
         }
     }
 
-    public class ExtractedInstapaperArticle : ExtractedSource
+    public class ExtractedInstapaperArticle : ExtractedDocument
     {
         public ExtractedInstapaperArticle(string title) : base(title)
         {
